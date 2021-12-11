@@ -1,72 +1,112 @@
-include(vcpkg_common_functions)
+vcpkg_fail_port_install(ON_TARGET "UWP")
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO pocoproject/poco
-    REF poco-1.9.0-release
-    SHA512 de2346d62b2e89ba04abe62a83f6ede7a496e80bcbe53a880a1aa8e87a8ebd9a430dd70fdc6aada836bb1021c6df21375fd0cbcf62dbb6e29a2f65d6d90cf2b9
-    HEAD_REF develop
+    REF f81a38057f1d240fe7b7a069612776f788bc88ea # poco-1.11.0-release
+    SHA512 c5f39aca8b5464959b9337b0cbd8ee86d81f195f5a5ba864692c71b2bdbffdecef0537b6e6a2d9f41829bcd58f78825b10565d0c4ee7b3c856a4886a9e328118
+    HEAD_REF master
     PATCHES
-        config_h.patch
-        find_pcre.patch
-        foundation-public-include-pcre.patch
-        fix-static-internal-pcre.patch
+        # Fix embedded copy of pcre in static linking mode
+        static_pcre.patch
+        # Add the support of arm64-windows
+        arm64_pcre.patch
+        fix_dependency.patch
+        fix-feature-sqlite3.patch
+        fix-error-c3861.patch
 )
 
+file(REMOVE "${SOURCE_PATH}/Foundation/src/pcre.h")
+file(REMOVE "${SOURCE_PATH}/cmake/V39/FindEXPAT.cmake")
+file(REMOVE "${SOURCE_PATH}/cmake/V313/FindSQLite3.cmake")
+file(REMOVE "${SOURCE_PATH}/cmake/FindPCRE.cmake")
+file(REMOVE "${SOURCE_PATH}/XML/src/expat_config.h")
+file(REMOVE "${SOURCE_PATH}/cmake/FindMySQL.cmake")
+
+# define Poco linkage type
 string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" POCO_STATIC)
 string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" POCO_MT)
 
-if("mysql" IN_LIST FEATURES)
-    # enabling MySQL support
-    set(MYSQL_INCLUDE_DIR "${CURRENT_INSTALLED_DIR}/include/mysql")
-    set(MYSQL_LIB "${CURRENT_INSTALLED_DIR}/lib/libmysql.lib")
-    set(MYSQL_LIB_DEBUG "${CURRENT_INSTALLED_DIR}/debug/lib/libmysql.lib")
-endif()
-
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
-    OPTIONS
-        -DPOCO_STATIC=${POCO_STATIC}
-        -DPOCO_MT=${POCO_MT}
-        -DENABLE_SEVENZIP=ON
-        -DENABLE_TESTS=OFF
-        -DPOCO_UNBUNDLED=ON # OFF means: using internal copy of sqlite, libz, pcre, expat, ...
-        -DMYSQL_INCLUDE_DIR=${MYSQL_INCLUDE_DIR}
-    OPTIONS_RELEASE
-        -DMYSQL_LIB=${MYSQL_LIB}
-    OPTIONS_DEBUG
-        -DMYSQL_LIB=${MYSQL_LIB_DEBUG}
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        pdf         ENABLE_PDF
+        netssl      ENABLE_NETSSL
+        netssl      ENABLE_NETSSL_WIN
+        netssl      ENABLE_CRYPTO
+        sqlite3     ENABLE_DATA_SQLITE
+        postgresql  ENABLE_DATA_POSTGRESQL
 )
 
-vcpkg_install_cmake()
-
-file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/tools)
-if(EXISTS "${CURRENT_PACKAGES_DIR}/bin/cpspc.exe")
-    file(RENAME ${CURRENT_PACKAGES_DIR}/bin/cpspc.exe ${CURRENT_PACKAGES_DIR}/tools/cpspc.exe)
-    file(RENAME ${CURRENT_PACKAGES_DIR}/bin/f2cpsp.exe ${CURRENT_PACKAGES_DIR}/tools/f2cpsp.exe)
+if ("mysql" IN_LIST FEATURES OR "mariadb" IN_LIST FEATURES)
+    set(POCO_USE_MYSQL ON)
 else()
-    file(RENAME ${CURRENT_PACKAGES_DIR}/bin/cpspc ${CURRENT_PACKAGES_DIR}/tools/cpspc)
-    file(RENAME ${CURRENT_PACKAGES_DIR}/bin/f2cpsp ${CURRENT_PACKAGES_DIR}/tools/f2cpsp)
+    set(POCO_USE_MYSQL OFF)
 endif()
 
-if (VCPKG_LIBRARY_LINKAGE STREQUAL static)
-    file(REMOVE_RECURSE
-        ${CURRENT_PACKAGES_DIR}/bin
-        ${CURRENT_PACKAGES_DIR}/debug/bin)
-else()
-    file(REMOVE
-        ${CURRENT_PACKAGES_DIR}/bin/cpspc.pdb
-        ${CURRENT_PACKAGES_DIR}/bin/f2cpsp.pdb
-        ${CURRENT_PACKAGES_DIR}/debug/bin/cpspc.exe
-        ${CURRENT_PACKAGES_DIR}/debug/bin/cpspc.pdb
-        ${CURRENT_PACKAGES_DIR}/debug/bin/f2cpsp.exe
-        ${CURRENT_PACKAGES_DIR}/debug/bin/f2cpsp.pdb)
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS ${FEATURE_OPTIONS}
+        # force to use dependencies as external
+        -DPOCO_UNBUNDLED=ON
+        # Define linking feature
+        -DPOCO_STATIC=${POCO_STATIC}
+        -DPOCO_MT=${POCO_MT}
+        -DENABLE_TESTS=OFF
+        # Allow enabling and disabling components
+        # POCO_ENABLE_SQL_ODBC, POCO_ENABLE_SQL_MYSQL and POCO_ENABLE_SQL_POSTGRESQL are
+        # defined on the fly if the required librairies are present
+        -DENABLE_ENCODINGS=ON
+        -DENABLE_ENCODINGS_COMPILER=ON
+        -DENABLE_XML=ON
+        -DENABLE_JSON=ON
+        -DENABLE_MONGODB=ON
+        # -DPOCO_ENABLE_SQL_SQLITE=ON # SQLITE are not supported.
+        -DENABLE_REDIS=ON
+        -DENABLE_UTIL=ON
+        -DENABLE_NET=ON
+        -DENABLE_SEVENZIP=ON
+        -DENABLE_ZIP=ON
+        -DENABLE_CPPPARSER=ON
+        -DENABLE_POCODOC=ON
+        -DENABLE_PAGECOMPILER=ON
+        -DENABLE_PAGECOMPILER_FILE2PAGE=ON
+        -DPOCO_DISABLE_INTERNAL_OPENSSL=ON
+        -DENABLE_APACHECONNECTOR=OFF
+        -DENABLE_DATA_MYSQL=${POCO_USE_MYSQL}
+)
+
+vcpkg_cmake_install()
+
+vcpkg_copy_pdbs()
+
+# Move apps to the tools folder
+vcpkg_copy_tools(TOOL_NAMES cpspc f2cpsp PocoDoc tec arc AUTO_CLEAN)
+
+# Copy additional include files not part of any libraries
+if(EXISTS "${CURRENT_PACKAGES_DIR}/include/Poco/SQL")
+    file(COPY ${SOURCE_PATH}/Data/include DESTINATION ${CURRENT_PACKAGES_DIR})
+endif()
+if(EXISTS "${CURRENT_PACKAGES_DIR}/include/Poco/SQL/MySQL")
+    file(COPY ${SOURCE_PATH}/Data/MySQL/include DESTINATION ${CURRENT_PACKAGES_DIR})
+endif()
+if(EXISTS "${CURRENT_PACKAGES_DIR}/include/Poco/SQL/ODBC")
+    file(COPY ${SOURCE_PATH}/Data/ODBC/include DESTINATION ${CURRENT_PACKAGES_DIR})
+endif()
+if(EXISTS "${CURRENT_PACKAGES_DIR}/include/Poco/SQL/PostgreSQL")
+    file(COPY ${SOURCE_PATH}/Data/PostgreSQL/include DESTINATION ${CURRENT_PACKAGES_DIR})
+    file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/include/libpq)
+endif()
+if(EXISTS "${CURRENT_PACKAGES_DIR}/include/Poco/SQL/SQLite")
+    file(COPY ${SOURCE_PATH}/Data/SQLite/include DESTINATION ${CURRENT_PACKAGES_DIR})
 endif()
 
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-vcpkg_fixup_cmake_targets(CONFIG_PATH lib/cmake/Poco)
+if(VCPKG_TARGET_IS_WINDOWS)
+  vcpkg_cmake_config_fixup(CONFIG_PATH cmake)
+else()
+  vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/Poco)
+endif()
 
-# copy license
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/poco)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/poco/LICENSE ${CURRENT_PACKAGES_DIR}/share/poco/copyright)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

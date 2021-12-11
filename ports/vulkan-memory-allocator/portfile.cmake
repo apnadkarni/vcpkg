@@ -1,14 +1,12 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-    REF v2.1.0
-    SHA512 4d7d431d52503d4d448a8b571935678a8a04d8f4a7eceb6ad49cde4f78954e7a2a0a91e48c75382699a62d81cf00601aaa0a358d979ed8e14741a9956484b51e
+    REF 55868965ae1fa956c07695d4642e1add8c9450f7
+    SHA512 433d8a961a1fa4c80894f014fdfbbcafeb94932a3eea2eced9c7109dcbf7350a60efb9fb1d8f3c621f2d72c118f47f82f8e9e6f4db75038fbad3a727b5896479
     HEAD_REF master
 )
 
-file(COPY "${SOURCE_PATH}/src/vk_mem_alloc.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include")
+file(COPY "${SOURCE_PATH}/include/vk_mem_alloc.h" DESTINATION "${CURRENT_PACKAGES_DIR}/include")
 
 file(COPY ${CMAKE_CURRENT_LIST_DIR}/unofficial-vulkan-memory-allocator-config.cmake DESTINATION ${CURRENT_PACKAGES_DIR}/share/unofficial-vulkan-memory-allocator)
 

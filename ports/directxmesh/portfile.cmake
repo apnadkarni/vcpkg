@@ -1,50 +1,64 @@
-include(vcpkg_common_functions)
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
-if (VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
-    message(STATUS "Warning: Dynamic building not supported yet. Building static.")
-    set(VCPKG_LIBRARY_LINKAGE static)
-endif()
-
-if(NOT VCPKG_CRT_LINKAGE STREQUAL "dynamic")
-  message(FATAL_ERROR "DirectXMesh only supports dynamic CRT linkage")
-endif()
+vcpkg_fail_port_install(ON_TARGET "OSX")
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO Microsoft/DirectXMesh
-    REF nov2018
-    SHA512 b1abeabd81c7d6c12adfea1ca8d563aa7c22ba1a64aa7a49b7839c0788922cec604a041dddbd3aca6a3b7c8412b1117dfee9c1163862de10757a7747669017ed
+    REF nov2021b
+    SHA512 be2137c02c7a5973eaf91eaacfc9174148ec6dc68b163507d8146beb87c1ffff512e2593f7fd000ea7be440529ed2deda415e0dacd53e4c7d9679e97c6440d3d
     HEAD_REF master
 )
 
-IF (TRIPLET_SYSTEM_ARCH MATCHES "x86")
-    SET(BUILD_ARCH "Win32")
-ELSE()
-    SET(BUILD_ARCH ${TRIPLET_SYSTEM_ARCH})
-ENDIF()
-
-vcpkg_build_msbuild(
-    PROJECT_PATH ${SOURCE_PATH}/DirectXMesh_Desktop_2017.sln
-    PLATFORM ${BUILD_ARCH}
+vcpkg_check_features(
+    OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        dx12 BUILD_DX12
 )
 
-file(INSTALL
-    ${SOURCE_PATH}/DirectXMesh/DirectXMesh.h
-    ${SOURCE_PATH}/DirectXMesh/DirectXMesh.inl
-    DESTINATION ${CURRENT_PACKAGES_DIR}/include
+if (VCPKG_HOST_IS_LINUX)
+    message(WARNING "Build ${PORT} requires GCC version 9 or later")
+endif()
+
+if(VCPKG_TARGET_IS_UWP)
+  set(EXTRA_OPTIONS -DBUILD_TOOLS=OFF)
+else()
+  set(EXTRA_OPTIONS -DBUILD_TOOLS=ON)
+endif()
+
+vcpkg_cmake_configure(
+    SOURCE_PATH ${SOURCE_PATH}
+    OPTIONS ${FEATURE_OPTIONS} ${EXTRA_OPTIONS}
 )
-file(INSTALL
-    ${SOURCE_PATH}/DirectXMesh/Bin/Desktop_2017/${BUILD_ARCH}/Debug/DirectXMesh.lib
-    DESTINATION ${CURRENT_PACKAGES_DIR}/debug/lib)
-file(INSTALL
-    ${SOURCE_PATH}/DirectXMesh/Bin/Desktop_2017/${BUILD_ARCH}/Release/DirectXMesh.lib
-    DESTINATION ${CURRENT_PACKAGES_DIR}/lib)
 
-set(TOOL_PATH ${CURRENT_PACKAGES_DIR}/tools)
-file(INSTALL
-    ${SOURCE_PATH}/Meshconvert/Bin/Desktop_2017/${BUILD_ARCH}/Release/Meshconvert.exe
-    DESTINATION ${TOOL_PATH})
+vcpkg_cmake_install()
+vcpkg_cmake_config_fixup(CONFIG_PATH cmake)
 
-# Handle copyright
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/directxmesh)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/directxmesh/LICENSE ${CURRENT_PACKAGES_DIR}/share/directxmesh/copyright)
+if((VCPKG_HOST_IS_WINDOWS) AND (VCPKG_TARGET_ARCHITECTURE MATCHES x64))
+  vcpkg_download_distfile(
+    MESHCONVERT_EXE
+    URLS "https://github.com/Microsoft/DirectXMesh/releases/download/nov2021/meshconvert.exe"
+    FILENAME "meshconvert-nov2021.exe"
+    SHA512 0f97ac49ce292b1cb90372884f1d6a4fc10eb3e92125a854ee9b7030fd9d0564536cdd88199aa4838832ae2a1e9c2df2c9e32c106705b6b06f156994b9476360
+  )
+
+  file(MAKE_DIRECTORY "${CURRENT_PACKAGES_DIR}/tools/directxmesh/")
+
+  file(INSTALL
+    ${MESHCONVERT_EXE}
+    DESTINATION ${CURRENT_PACKAGES_DIR}/tools/directxmesh/)
+
+  file(RENAME ${CURRENT_PACKAGES_DIR}/tools/directxmesh/meshconvert-nov2021.exe ${CURRENT_PACKAGES_DIR}/tools/directxmesh/meshconvert.exe)
+
+elseif((VCPKG_TARGET_IS_WINDOWS) AND (NOT VCPKG_TARGET_IS_UWP))
+
+  vcpkg_copy_tools(
+        TOOL_NAMES meshconvert
+        SEARCH_DIR ${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/bin/CMake
+    )
+
+endif()
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+
+file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)

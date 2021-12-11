@@ -1,5 +1,3 @@
-include(vcpkg_common_functions)
-
 if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
     message(FATAL_ERROR "WindowsStore not supported")
 endif()
@@ -14,8 +12,8 @@ set(VCPKG_CRT_LINKAGE "static")
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO unicorn-engine/unicorn
-    REF 3df5ef8ab1cffc43fab461bfd24e42ae6c5919cf
-    SHA512 0b3037138075ad1bdc3be38295308dc15b5930b3c5de10cd0ac203e159b2dd0423ab74fe1a53e1922a5c809b2862e17b8a8d8d921335687755c1d210e21e4d0e
+    REF abe452babc13299f598a47f7c87873a4ae34bf09 # accessed on 2020-09-14
+    SHA512 8ad4b76cc98fc9d21421c93ad7084665622fd0ed4de87cb189c5d7ed1bbc83ccd365bd08c4ccfa81539e42fa3a74ffc7e2e33a74f2bfdfd4b2b9e2e5425f2fc9
     HEAD_REF master
 )
 

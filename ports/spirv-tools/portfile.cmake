@@ -1,43 +1,57 @@
-include(vcpkg_common_functions)
 
 vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO KhronosGroup/SPIRV-Tools
-    REF v2018.1
-    SHA512 0637c413dafd931e8222f9bf70a024f8b64116f0300c7732b86bcaff321188a0e746f79c1385ae23a7692e83194586b57692960d5be607fb2d7960731b6cd63f
-    HEAD_REF master
-)
-
-vcpkg_from_github(
-    OUT_SOURCE_PATH SPIRV_HEADERS_PATH
-    REPO KhronosGroup/SPIRV-Headers
-    REF bd4c092be34081d88ec8342b1a4d9f77bcce4cac
-    SHA512 e0bc7b8ea73bef762eff60d83104ca93c70e06c7b6e66f73c931eb9ec51227e0b64c3169fcccbffa311acf714138300104dd5e51cdfc846ed7961debc1f9cceb
-    HEAD_REF master
+    REF v2021.1
+    SHA512 e8478eacb86415f75a1e5b3f66a0508b01a9f7e9d8b070eb0329ca56be137f5543dd42125a1033cb8552c01f46e11affd7fda866231b3742c66de9b4341930d5
+    PATCHES
+        cmake-install.patch
+        install-config-typo.patch
+        0001-don-t-use-MP4.patch
 )
 
 vcpkg_find_acquire_program(PYTHON3)
 get_filename_component(PYTHON3_DIR "${PYTHON3}" DIRECTORY)
 vcpkg_add_to_path("${PYTHON3_DIR}")
 
+if(VCPKG_TARGET_IS_IOS)
+    message(STATUS "Using iOS trplet. Executables won't be created...")
+    set(TOOLS_INSTALL OFF)
+    set(SKIP_EXECUTABLES ON) 
+else()
+    set(TOOLS_INSTALL ON)
+    set(SKIP_EXECUTABLES OFF)
+endif()
+
 vcpkg_configure_cmake(
     SOURCE_PATH ${SOURCE_PATH}
     PREFER_NINJA
     OPTIONS
-        -DSPIRV-Headers_SOURCE_DIR=${SPIRV_HEADERS_PATH}
+        -DSPIRV-Headers_SOURCE_DIR=${CURRENT_INSTALLED_DIR}
         -DSPIRV_WERROR=OFF
+        -DSPIRV_SKIP_EXECUTABLES=${SKIP_EXECUTABLES} # option SPIRV_SKIP_TESTS follows this value
+        -DENABLE_SPIRV_TOOLS_INSTALL=${TOOLS_INSTALL}
+        -DSPIRV_TOOLS_BUILD_STATIC=ON
 )
 
 vcpkg_install_cmake()
+vcpkg_fixup_cmake_targets(CONFIG_PATH share/SPIRV-Tools TARGET_PATH share/SPIRV-Tools) # the directory name is capitalized as opposed to the package name
+vcpkg_fixup_cmake_targets(CONFIG_PATH share/SPIRV-Tools-link TARGET_PATH share/SPIRV-Tools-link)
+vcpkg_fixup_cmake_targets(CONFIG_PATH share/SPIRV-Tools-opt TARGET_PATH share/SPIRV-Tools-opt)
+vcpkg_fixup_cmake_targets(CONFIG_PATH share/SPIRV-Tools-reduce TARGET_PATH share/SPIRV-Tools-reduce)
+vcpkg_fixup_pkgconfig()
 
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-file(GLOB EXES "${CURRENT_PACKAGES_DIR}/bin/*${CMAKE_EXECUTABLE_SUFFIX}")
-file(COPY ${EXES} DESTINATION ${CURRENT_PACKAGES_DIR}/tools)
-file(REMOVE ${EXES})
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/bin ${CURRENT_PACKAGES_DIR}/debug/bin)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/bin") # only static linkage, i.e. no need to preserve .dll/.so files
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+file(REMOVE "${CURRENT_PACKAGES_DIR}/bin/SPIRV-Tools-shared.dll")
+file(REMOVE "${CURRENT_PACKAGES_DIR}/lib/libSPIRV-Tools-shared.so")
+file(REMOVE "${CURRENT_PACKAGES_DIR}/debug/lib/libSPIRV-Tools-shared.so")
+if(TOOLS_INSTALL)
+    file(MAKE_DIRECTORY "${CURRENT_PACKAGES_DIR}/tools")
+    file(RENAME "${CURRENT_PACKAGES_DIR}/bin" "${CURRENT_PACKAGES_DIR}/tools/${PORT}")
+endif()
 
-# Handle copyright
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/spirv-tools)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/spirv-tools/LICENSE ${CURRENT_PACKAGES_DIR}/share/spirv-tools/copyright)
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

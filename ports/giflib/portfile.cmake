@@ -1,26 +1,32 @@
-include(vcpkg_common_functions)
-set(SOURCE_PATH ${CURRENT_BUILDTREES_DIR}/src/giflib-5.1.4)
-vcpkg_download_distfile(ARCHIVE
-    URLS "http://downloads.sourceforge.net/sourceforge/giflib/giflib-5.1.4.tar.bz2"
-    FILENAME "giflib-5.1.4.tar.bz2"
-    SHA512 32b5e342056c210e6478e9cb3b6ceec9594dcfaf34feea1eb4dad633a081ed4465bceee578c19165907cb47cb83912ac359ceea666a8e07dbbb5420f9928f96d
-)
-vcpkg_extract_source_archive(${ARCHIVE})
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt DESTINATION ${SOURCE_PATH})
+set(GIFLIB_VERSION 5.2.1)
 
-vcpkg_apply_patches(
-    SOURCE_PATH ${SOURCE_PATH}
+set(EXTRA_PATCHES "")
+if (VCPKG_TARGET_IS_WINDOWS)
+    list(APPEND EXTRA_PATCHES fix-compile-error.patch)
+endif()
+
+vcpkg_from_sourceforge(
+    OUT_SOURCE_PATH SOURCE_PATH
+    REPO "giflib"
+    FILENAME "giflib-${GIFLIB_VERSION}.tar.gz"
+    SHA512 4550e53c21cb1191a4581e363fc9d0610da53f7898ca8320f0d3ef6711e76bdda2609c2df15dc94c45e28bff8de441f1227ec2da7ea827cb3c0405af4faa4736
     PATCHES
-        ${CMAKE_CURRENT_LIST_DIR}/msvc-guard-unistd-h.patch
+        msvc-guard-unistd-h.patch
+        disable-GifDrawBoxedText8x8-win32.patch # MSVC doesn't have strtok_r
+        ${EXTRA_PATCHES}
 )
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
+file(COPY "${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt" DESTINATION "${SOURCE_PATH}")
+
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        "-DGIFLIB_EXPORTS=${CMAKE_CURRENT_LIST_DIR}/exports.def"
     OPTIONS_DEBUG
         -DGIFLIB_SKIP_HEADERS=ON
 )
 
-vcpkg_install_cmake()
+vcpkg_cmake_install()
 vcpkg_copy_pdbs()
 
-file(INSTALL ${SOURCE_PATH}/COPYING DESTINATION ${CURRENT_PACKAGES_DIR}/share/giflib RENAME copyright)
+file(INSTALL "${SOURCE_PATH}/COPYING" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

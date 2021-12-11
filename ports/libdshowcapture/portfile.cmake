@@ -1,5 +1,3 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO obsproject/libdshowcapture
@@ -17,7 +15,7 @@ vcpkg_build_cmake(TARGET libdshowcapture)
 
 # Copy files
 file(INSTALL ${SOURCE_PATH}/COPYING DESTINATION ${CURRENT_PACKAGES_DIR}/share/libdshowcapture RENAME copyright)
-if(NOT VCPKG_LIBRARY_LINKAGE STREQUAL static)
+if(VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
     file(INSTALL ${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/libdshowcapture.dll DESTINATION ${CURRENT_PACKAGES_DIR}/debug/bin)
     file(INSTALL ${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/libdshowcapture.dll DESTINATION ${CURRENT_PACKAGES_DIR}/bin)
 endif()

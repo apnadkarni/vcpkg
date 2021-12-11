@@ -1,5 +1,3 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_bitbucket(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO alexey_gruzdev/yato
@@ -21,6 +19,7 @@ file(COPY "${SOURCE_PATH}/modules/config/yato"
 
 vcpkg_configure_cmake(
     SOURCE_PATH ${SOURCE_PATH}
+    PREFER_NINJA
     OPTIONS
         -DYATO_BUILD_TESTS:BOOL=OFF
         -DYATO_BUILD_ACTORS:BOOL=ON

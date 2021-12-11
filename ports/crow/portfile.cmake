@@ -1,12 +1,11 @@
-include(vcpkg_common_functions)
-
-set(SOURCE_PATH ${CURRENT_BUILDTREES_DIR}/src/crow-0.1)
-vcpkg_download_distfile(ARCHIVE_FILE
-    URLS "https://github.com/ipkn/crow/archive/v0.1.tar.gz"
-    FILENAME "crow-v0.1.tar.gz"
-    SHA512 5a97c5b8cda3ffe79001aa382d4391eddde30027401bbb1d9c85c70ea715f556d3659f5eac0b9d9192c19d13718f19ad6bdf49d67bef03b21e75300d60e7d02a
+vcpkg_from_github(
+    OUT_SOURCE_PATH SOURCE_PATH
+    REPO CrowCpp/crow
+    REF a166a6d3cb08b10e9b00b57fd2216b9c4329d4e6 #0.3+3
+    SHA512 5a32f66c96376c9c17f82492a7bc6f77417aa9dd808c082a2aeae983d05e895c27c2a01c46f8b5fdf9d30267ad14e8ba64a629ba354dce6ce0f7a2ff5d0a7fb2
+    FILE_DISAMBIGUATOR 1
+    HEAD_REF master
 )
-vcpkg_extract_source_archive(${ARCHIVE_FILE})
 
-file(INSTALL ${SOURCE_PATH}/include/ DESTINATION ${CURRENT_PACKAGES_DIR}/include)
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/crow RENAME copyright)
+file(INSTALL "${SOURCE_PATH}/include/" DESTINATION "${CURRENT_PACKAGES_DIR}/include")
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

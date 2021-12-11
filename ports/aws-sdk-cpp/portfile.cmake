@@ -1,40 +1,56 @@
-include(vcpkg_common_functions)
+vcpkg_buildpath_length_warning(37)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO aws/aws-sdk-cpp
-    REF 1.7.41
-    SHA512 4cd6bf8aae464caadc696ff204da4d60caab3d4d95c058094b1fa499d53bd585dddc853cfc75295f7731f46a2a0e2a94339a2d83e6b21a12e9c80b7c53556ae9
-    HEAD_REF master
+    REF 26fa78673ec93dc703e80b741d8b437237798297 # 1.9.160
+    SHA512 dfc6c1017dd1e76196861f0bd7e270736c2e74d55da1e394f7d64d8b1e2d978ad21f273ba4cd5d476d5f7dbe21eb0e3f170017dff97d3c3cca951f3ac68cf6f8
+    PATCHES
+        fix-config.patch
+        patch-relocatable-rpath.patch
+        fix-aws-root.patch
 )
 
 string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "dynamic" FORCE_SHARED_CRT)
 
-set(BUILD_ONLY core)
-
-include(${CMAKE_CURRENT_LIST_DIR}/compute_build_only.cmake)
-
-if(CMAKE_HOST_WIN32)
-    string(REPLACE ";" "\\\\\\;" BUILD_ONLY "${BUILD_ONLY}")
+set(EXTRA_ARGS)
+if(VCPKG_TARGET_IS_OSX OR VCPKG_TARGET_IS_IOS)
+    set(rpath "@loader_path")
+elseif (VCPKG_TARGET_IS_ANDROID)
+    set(EXTRA_ARGS "-DTARGET_ARCH=ANDROID"
+            "-DGIT_EXECUTABLE=--invalid-git-executable--"
+            "-DGIT_FOUND=TRUE"
+            "-DNDK_DIR=$ENV{ANDROID_NDK_HOME}"
+            "-DANDROID_BUILD_ZLIB=FALSE"
+            "-DANDROID_BUILD_CURL=FALSE"
+            "-DANDROID_BUILD_OPENSSL=FALSE"
+            )
 else()
-    string(REPLACE ";" "\\\\\\\\\\\;" BUILD_ONLY "${BUILD_ONLY}")
+    set(rpath "\$ORIGIN")
 endif()
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
+set(BUILD_ONLY core)
+include(${CMAKE_CURRENT_LIST_DIR}/compute_build_only.cmake)
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    DISABLE_PARALLEL_CONFIGURE
     OPTIONS
-        -DENABLE_UNITY_BUILD=ON
-        -DENABLE_TESTING=OFF
-        -DFORCE_SHARED_CRT=${FORCE_SHARED_CRT}
-        -DCMAKE_DISABLE_FIND_PACKAGE_Git=TRUE
+        ${EXTRA_ARGS}
+        "-DENABLE_UNITY_BUILD=ON"
+        "-DENABLE_TESTING=OFF"
+        "-DFORCE_SHARED_CRT=${FORCE_SHARED_CRT}"
         "-DBUILD_ONLY=${BUILD_ONLY}"
-        -DBUILD_DEPS=OFF
+        "-DBUILD_DEPS=OFF"
+        "-DBUILD_SHARED_LIBS=OFF"
+        "-DCMAKE_INSTALL_RPATH=${rpath}"
+        "-DCMAKE_MODULE_PATH=${CURRENT_INSTALLED_DIR}/share/aws-c-common" # use extra cmake files
 )
+vcpkg_cmake_install()
 
-vcpkg_install_cmake()
-
-vcpkg_fixup_cmake_targets(CONFIG_PATH lib/cmake TARGET_PATH share)
+foreach(TARGET IN LISTS BUILD_ONLY)
+    vcpkg_cmake_config_fixup(PACKAGE_NAME "aws-cpp-sdk-${TARGET}" CONFIG_PATH "lib/cmake/aws-cpp-sdk-${TARGET}" DO_NOT_DELETE_PARENT_CONFIG_PATH)
+endforeach() 
+vcpkg_cmake_config_fixup(PACKAGE_NAME "AWSSDK" CONFIG_PATH "lib/cmake/AWSSDK")
 
 vcpkg_copy_pdbs()
 
@@ -56,13 +72,12 @@ foreach(AWS_CONFIG IN LISTS AWS_CONFIGS)
 endforeach()
 
 file(REMOVE_RECURSE
-    ${CURRENT_PACKAGES_DIR}/debug/include
-    ${CURRENT_PACKAGES_DIR}/debug/share
-    ${CURRENT_PACKAGES_DIR}/share/AWSSDK
-    ${CURRENT_PACKAGES_DIR}/lib/pkgconfig
-    ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig
-    ${CURRENT_PACKAGES_DIR}/nuget
-    ${CURRENT_PACKAGES_DIR}/debug/nuget
+    "${CURRENT_PACKAGES_DIR}/debug/include"
+    "${CURRENT_PACKAGES_DIR}/debug/share"
+    "${CURRENT_PACKAGES_DIR}/lib/pkgconfig"
+    "${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig"
+    "${CURRENT_PACKAGES_DIR}/nuget"
+    "${CURRENT_PACKAGES_DIR}/debug/nuget"
 )
 
 if(VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
@@ -77,8 +92,9 @@ if(VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
         file(REMOVE ${DEBUG_LIB_FILES})
     endif()
 
-    file(APPEND ${CURRENT_PACKAGES_DIR}/include/aws/core/SDKConfig.h "#ifndef USE_IMPORT_EXPORT\n#define USE_IMPORT_EXPORT\n#endif")
+    file(APPEND "${CURRENT_PACKAGES_DIR}/include/aws/core/SDKConfig.h" "#ifndef USE_IMPORT_EXPORT\n#define USE_IMPORT_EXPORT\n#endif")
 endif()
 
-# Handle copyright
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/aws-sdk-cpp RENAME copyright)
+configure_file("${CURRENT_PORT_DIR}/usage" "${CURRENT_PACKAGES_DIR}/share/${PORT}/usage" @ONLY)
+
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

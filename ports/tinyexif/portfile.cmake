@@ -1,5 +1,3 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO cdcseacave/TinyEXIF
@@ -20,7 +18,7 @@ vcpkg_configure_cmake(
 
 vcpkg_install_cmake()
 
-vcpkg_fixup_cmake_targets(CONFIG_PATH "lib/cmake/tinyexif")
+vcpkg_fixup_cmake_targets(CONFIG_PATH lib/cmake/TinyEXIF)
 
 vcpkg_copy_pdbs()
 

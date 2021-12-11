@@ -1,22 +1,19 @@
-if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
-    message("Building DLLs not supported. Building static instead.")
-    set(VCPKG_LIBRARY_LINKAGE static)
-endif()
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
-include(vcpkg_common_functions)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO google/flatbuffers
-    REF v1.10.0
-    SHA512 b8382c8e9a45d6aca83270e93704b9ef2938e4ef9bb5165edbd8f286329e86353037ad6e54a99fd3d70b0c893d06cfd8766e00f05497e69be4b9e6c0506133d2
+    REF v2.0.0
+    SHA512 26a06b572c0e4c9685743bd2d2162ac7dcd74b9324624cc3f3ef5b154c0cee7c52a04b77cdc184245d2d6ae38dfdcc4fd66001c318aa8ca001d2bf1d85d66a89
     HEAD_REF master
     PATCHES
-        ${CMAKE_CURRENT_LIST_DIR}/ignore_use_of_cmake_toolchain_file.patch
-        ${CMAKE_CURRENT_LIST_DIR}/no-werror.patch
+        ignore_use_of_cmake_toolchain_file.patch
+        no-werror.patch
+        fix-uwp-build.patch
 )
 
 set(OPTIONS)
-if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+if(VCPKG_TARGET_IS_UWP OR VCPKG_TARGET_IS_IOS)
     list(APPEND OPTIONS -DFLATBUFFERS_BUILD_FLATC=OFF -DFLATBUFFERS_BUILD_FLATHASH=OFF)
 endif()
 
@@ -30,7 +27,7 @@ vcpkg_configure_cmake(
 )
 
 vcpkg_install_cmake()
-vcpkg_fixup_cmake_targets(CONFIG_PATH "lib/cmake/flatbuffers")
+vcpkg_fixup_cmake_targets(CONFIG_PATH lib/cmake/flatbuffers)
 
 file(GLOB flatc_path ${CURRENT_PACKAGES_DIR}/bin/flatc*)
 if(flatc_path)
@@ -41,13 +38,13 @@ if(flatc_path)
         ${flatc_path}
         ${CURRENT_PACKAGES_DIR}/tools/flatbuffers/${flatc_executable}
     )
-vcpkg_copy_tool_dependencies(${CURRENT_PACKAGES_DIR}/tools/flatbuffers)
+    vcpkg_copy_tool_dependencies(${CURRENT_PACKAGES_DIR}/tools/flatbuffers)
 endif()
 
 file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
 file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/bin ${CURRENT_PACKAGES_DIR}/debug/bin)
 
 # Handle copyright
-file(COPY ${SOURCE_PATH}/LICENSE.txt DESTINATION ${CURRENT_PACKAGES_DIR}/share/flatbuffers)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/flatbuffers/LICENSE.txt ${CURRENT_PACKAGES_DIR}/share/flatbuffers/copyright)
+file(INSTALL ${SOURCE_PATH}/LICENSE.txt DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)
 
+vcpkg_fixup_pkgconfig()

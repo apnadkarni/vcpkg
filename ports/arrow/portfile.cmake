@@ -1,75 +1,105 @@
-include(vcpkg_common_functions)
-
-if(NOT VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
-  message(FATAL_ERROR "Apache Arrow only supports x64")
-endif()
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO apache/arrow
-    REF apache-arrow-0.11.1
-    SHA512 8a2de7e4b40666e4ea7818fac488549f1348e961e7cb6a4166ae4019976a574fd115dc1cabaf44bc1cbaabf15fb8e5133c8232b34fca250d8ff7c5b65c5407c8
+    REF apache-arrow-6.0.0
+    SHA512 a5f89085f06a52c85ed9aadd5deee5988c28ab2abd775bb22b9c26efb99429ad3dead7e1976777c3fa159b8c07b536c04eac43fa81e655f40c08c07ba12f8b8b
     HEAD_REF master
-)
-
-set(CPP_SOURCE_PATH "${SOURCE_PATH}/cpp")
-
-vcpkg_apply_patches(
-    SOURCE_PATH ${CPP_SOURCE_PATH}
     PATCHES
-    "${CMAKE_CURRENT_LIST_DIR}/all.patch"
+        all.patch
+        fix-dependencies.patch
 )
+
+file(REMOVE "${SOURCE_PATH}/cpp/cmake_modules/Findzstd.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindBrotli.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/Find-c-aresAlt.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindLz4.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindSnappy.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindThrift.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindGLOG.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/Findutf8proc.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindRapidJSONAlt.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindgRPCAlt.cmake"
+            "${SOURCE_PATH}/cpp/cmake_modules/FindgflagsAlt.cmake"
+)
+
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        csv         ARROW_CSV
+        dataset     ARROW_DATASET
+        filesystem  ARROW_FILESYSTEM
+        flight      ARROW_FLIGHT
+        json        ARROW_JSON
+        orc         ARROW_ORC
+        parquet     ARROW_PARQUET
+        parquet     PARQUET_REQUIRE_ENCRYPTION
+        s3          ARROW_S3
+)
+
+if(VCPKG_TARGET_IS_WINDOWS OR VCPKG_TARGET_IS_UWP)
+    set(MALLOC_OPTIONS -DARROW_JEMALLOC=OFF)
+elseif("jemalloc" IN_LIST FEATURES)
+    set(MALLOC_OPTIONS -DARROW_JEMALLOC=ON)
+else()
+    set(MALLOC_OPTIONS -DARROW_JEMALLOC=OFF)
+endif()
+
+if(VCPKG_TARGET_IS_WINDOWS AND ("mimalloc" IN_LIST FEATURES))
+    set(MALLOC_OPTIONS ${MALLOC_OPTIONS} -DARROW_MIMALLOC=ON)
+else()
+    set(MALLOC_OPTIONS ${MALLOC_OPTIONS} -DARROW_MIMALLOC=OFF)
+endif()
 
 string(COMPARE EQUAL ${VCPKG_LIBRARY_LINKAGE} "dynamic" ARROW_BUILD_SHARED)
 string(COMPARE EQUAL ${VCPKG_LIBRARY_LINKAGE} "static" ARROW_BUILD_STATIC)
+string(COMPARE EQUAL ${VCPKG_LIBRARY_LINKAGE} "dynamic" ARROW_DEPENDENCY_USE_SHARED)
 
-string(COMPARE EQUAL ${VCPKG_LIBRARY_LINKAGE} "static" IS_STATIC)
-
-if (IS_STATIC)
-    set(PARQUET_ARROW_LINKAGE static)
+if(VCPKG_TARGET_IS_WINDOWS)
+    set(THRIFT_USE_SHARED OFF)
 else()
-    set(PARQUET_ARROW_LINKAGE shared)
+    set(THRIFT_USE_SHARED ${ARROW_DEPENDENCY_USE_SHARED})
 endif()
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${CPP_SOURCE_PATH}
-    PREFER_NINJA
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}/cpp"
     OPTIONS
-    -DARROW_BUILD_TESTS=off
-    -DRAPIDJSON_HOME=${CURRENT_INSTALLED_DIR}
-    -DFLATBUFFERS_HOME=${CURRENT_INSTALLED_DIR}
-    -DARROW_ZLIB_VENDORED=ON
-    -DBROTLI_HOME=${CURRENT_INSTALLED_DIR}
-    -DLZ4_HOME=${CURRENT_INSTALLED_DIR}
-    -DZSTD_HOME=${CURRENT_INSTALLED_DIR}
-    -DSNAPPY_HOME=${CURRENT_INSTALLED_DIR}
-    -DBOOST_ROOT=${CURRENT_INSTALLED_DIR}
-    -DGFLAGS_HOME=${CURRENT_INSTALLED_DIR}
-    -DZLIB_HOME=${CURRENT_INSTALLED_DIR}
-    -DARROW_PARQUET=ON
-    -DARROW_BUILD_STATIC=${ARROW_BUILD_STATIC}
-    -DARROW_BUILD_SHARED=${ARROW_BUILD_SHARED}
-    -DBUILD_STATIC=${ARROW_BUILD_STATIC}
-    -DBUILD_SHARED=${ARROW_BUILD_SHARED}
-    -DPARQUET_ARROW_LINKAGE=${PARQUET_ARROW_LINKAGE}
-    -DDOUBLE_CONVERSION_HOME=${CURRENT_INSTALLED_DIR}
-    -DGLOG_HOME=${CURRENT_INSTALLED_DIR}
+        ${FEATURE_OPTIONS}
+        ${MALLOC_OPTIONS}
+        ${S3_OPTIONS}
+        -DCMAKE_SYSTEM_PROCESSOR=${VCPKG_TARGET_ARCHITECTURE}
+        -DARROW_BUILD_SHARED=${ARROW_BUILD_SHARED}
+        -DARROW_BUILD_STATIC=${ARROW_BUILD_STATIC}
+        -DARROW_BUILD_TESTS=OFF
+        -DARROW_DEPENDENCY_SOURCE=SYSTEM
+        -DARROW_DEPENDENCY_USE_SHARED=${ARROW_DEPENDENCY_USE_SHARED}
+        -DARROW_THRIFT_USE_SHARED=${THRIFT_USE_SHARED} 
+        -DBUILD_WARNING_LEVEL=PRODUCTION
+        -DARROW_WITH_BROTLI=ON                 
+        -DARROW_WITH_BZ2=ON
+        -DARROW_WITH_LZ4=ON
+        -DARROW_WITH_SNAPPY=ON
+        -DARROW_WITH_ZLIB=ON
+        -DARROW_WITH_ZSTD=ON
+        -DZSTD_MSVC_LIB_PREFIX=
+    MAYBE_UNUSED_VARIABLES
+        ZSTD_MSVC_LIB_PREFIX
 )
 
-vcpkg_install_cmake()
+vcpkg_cmake_install()
 
 vcpkg_copy_pdbs()
 
-if(WIN32)
-    if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
-        file(RENAME ${CURRENT_PACKAGES_DIR}/lib/arrow_static.lib ${CURRENT_PACKAGES_DIR}/lib/arrow.lib)
-        file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/arrow_static.lib ${CURRENT_PACKAGES_DIR}/debug/lib/arrow.lib)
-        file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/bin ${CURRENT_PACKAGES_DIR}/bin)
-    else()
-        file(REMOVE ${CURRENT_PACKAGES_DIR}/lib/arrow_static.lib ${CURRENT_PACKAGES_DIR}/debug/lib/arrow_static.lib)
-    endif()
+if(EXISTS "${CURRENT_PACKAGES_DIR}/lib/arrow_static.lib")
+    message(FATAL_ERROR "Installed lib file should be named 'arrow.lib' via patching the upstream build.")
 endif()
 
-file(INSTALL ${SOURCE_PATH}/LICENSE.txt DESTINATION ${CURRENT_PACKAGES_DIR}/share/arrow RENAME copyright)
+vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/arrow)
 
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/lib/cmake")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/lib/cmake")
+
+file(INSTALL "${SOURCE_PATH}/LICENSE.txt" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+
+vcpkg_fixup_pkgconfig()

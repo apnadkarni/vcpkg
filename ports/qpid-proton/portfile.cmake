@@ -1,48 +1,38 @@
-if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
-    message("qpid-proton does not support static linkage. Building dynamically.")
-    set(VCPKG_LIBRARY_LINKAGE "dynamic")
-endif()
+vcpkg_check_linkage(ONLY_DYNAMIC_LIBRARY)
 
-if(VCPKG_CRT_LINKAGE STREQUAL "static")
-    message(FATAL_ERROR "qpid-proton does not support static CRT linkage.")
-endif()
+vcpkg_find_acquire_program(PYTHON3)
 
-include(vcpkg_common_functions)
-
-# Use this throughout rather than literal string
-set(QPID_PROTON_VERSION 0.24.0)
-vcpkg_find_acquire_program(PYTHON2)
-
-# Go grab the code. Set SHA512 to 1 to get correct sha from download
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO apache/qpid-proton
-    REF ${QPID_PROTON_VERSION}
-    SHA512 a22154d5ea96330e22245a54233101256f02d10ee814a7f0f4b654e56128615acee0cfc0387cbec9b877dd20cc23a5b1635aa9e1d1b60a4b9aa985e449dcb62e
+    REF dc244b1f7e886883a2bb416407f42ba55d0f5f42 # 0.32.0
+    SHA512 19f191dd206fd43a8f5b8db95f6ada57bd60b93eb907cf32f463c23cfe8c5f4914c6f4750ebde50c970387fb62baf4451279803eeb000bc8bb5c200692e5d1d7 
     HEAD_REF next
 )
 
-# Run cmake configure step
-vcpkg_configure_cmake(SOURCE_PATH ${SOURCE_PATH}
-                      OPTIONS
-                          -DPYTHON_EXECUTABLE=${PYTHON2})
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        -DPYTHON_EXECUTABLE=${PYTHON3}
+        -DLIB_SUFFIX=
+        -DBUILD_GO=no
+        -DBUILD_RUBY=no
+        -DBUILD_PYTHON=no
+        -DENABLE_JSONCPP=ON
+        -DCMAKE_DISABLE_FIND_PACKAGE_CyrusSASL=ON
+)
 
-# Run cmake install step
-vcpkg_install_cmake()
+vcpkg_cmake_install()
 
-# Copy across any pdbs generated
 vcpkg_copy_pdbs()
+vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake)
+vcpkg_fixup_pkgconfig()
 
-# Rename share subdirectory
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/proton-${QPID_PROTON_VERSION}
-            ${CURRENT_PACKAGES_DIR}/share/${PORT})
+file(RENAME "${CURRENT_PACKAGES_DIR}/share/proton/LICENSE.txt"
+            "${CURRENT_PACKAGES_DIR}/share/${PORT}/copyright")
 
-# Vcpkg expects file with name "copyright"
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/${PORT}/LICENSE.txt
-            ${CURRENT_PACKAGES_DIR}/share/${PORT}/copyright)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/share/proton")
 
-# Remove extraneous unrequired-for-vcpkg files
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/share)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/lib/cmake)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/lib/cmake)
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/proton/version.h" "#define PN_INSTALL_PREFIX \"${CURRENT_PACKAGES_DIR}\"" "")

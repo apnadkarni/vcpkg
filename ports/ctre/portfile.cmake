@@ -1,15 +1,20 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO hanickadot/compile-time-regular-expressions
-    REF v2.2
-    SHA512 f6f18e3e5bc654ff94cd540a3b665615151678541575dfc8d4113c317fba5ea83f57694dc330c174110e6263c9b64a128f2a9234cc626a952e7518c423fda703
-    HEAD_REF master
+    REF v3.4.1
+    SHA512 a7b44df9c30fb46373e34d8b98fe3ef3fd0486d33ba4d7bbf58a29eef05b22b8c903bf79ae539008a564f46e0bdee3e7700819d8d072c00537f8d175af59be3e
+    HEAD_REF main
 )
 
-# Install header files
-file(INSTALL ${SOURCE_PATH}/include DESTINATION ${CURRENT_PACKAGES_DIR})
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        -DCTRE_BUILD_TESTS=OFF
+        -DCTRE_BUILD_PACKAGE=OFF
+)
+vcpkg_cmake_install()
+vcpkg_cmake_config_fixup(CONFIG_PATH "share/cmake/ctre")
 
-# Handle copyright
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/ctre RENAME copyright)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug")
+
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

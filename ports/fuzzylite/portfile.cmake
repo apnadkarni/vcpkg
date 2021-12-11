@@ -1,9 +1,3 @@
-include(vcpkg_common_functions)
-
-if(EXISTS "${CURRENT_BUILDTREES_DIR}/src/.git")
-    file(REMOVE_RECURSE ${CURRENT_BUILDTREES_DIR}/src)
-endif()
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO fuzzylite/fuzzylite
@@ -30,7 +24,6 @@ vcpkg_configure_cmake(
         -DFL_BUILD_TESTS=OFF
 )
 
-vcpkg_build_cmake()
 vcpkg_install_cmake()
 vcpkg_copy_pdbs()
 
@@ -43,4 +36,11 @@ if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
     file(RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/fuzzylite-static-debug.lib ${CURRENT_PACKAGES_DIR}/debug/lib/fuzzylite-debug.lib)
 endif()
 
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/fuzzylite RENAME copyright)
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
+    vcpkg_replace_string(${CURRENT_PACKAGES_DIR}/include/fl/fuzzylite.h
+        "#elif defined(FL_IMPORT_LIBRARY)"
+        "#elif 1"
+    )
+endif()
+
+file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)

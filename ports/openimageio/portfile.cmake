@@ -1,77 +1,92 @@
-include(vcpkg_common_functions)
+if("field3d" IN_LIST FEATURES)
+    vcpkg_fail_port_install(
+        ON_TARGET WINDOWS UWP
+        MESSAGE "The field3d feature is not supported on Windows"
+    )
+endif()
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO OpenImageIO/oiio
-    REF Release-1.8.16
-    SHA512 a919341df7d9625a869cad266d8434881b63a47f3da8daccf4bbab6675d45bd121ff780dd911a7447450fee44cd7bdd42d73aec59a99b667d6d98e79682db2c7
+    REF 9f74cf4d9813bfdcad5bca08b4ff75a25d056cb0 # 2.3.7.2
+    SHA512 cebc388e842e983f010c5f3bf57bed3fe1ae9d2eac79019472f8431b194d6a8b156b27cc5688bd0998aa2d01959d47bcdc7e637417f755433ffe32c491cdc376
     HEAD_REF master
     PATCHES
-        # fix_libraw: replace 'LibRaw_r_LIBRARIES' occurences by 'LibRaw_LIBRARIES'
-        #             since libraw port installs 'raw_r' library as 'raw'
-        fix_libraw.patch
-        use-webp.patch
+        fix-config-cmake.patch
+        fix_static_build.patch
+        disable-test.patch
+        fix-dependencies.patch
 )
 
 file(REMOVE_RECURSE "${SOURCE_PATH}/ext")
+
+file(REMOVE "${SOURCE_PATH}/src/cmake/modules/FindLibRaw.cmake"
+            "${SOURCE_PATH}/src/cmake/modules/FindOpenCV.cmake"
+            "${SOURCE_PATH}/src/cmake/modules/FindFFmpeg.cmake")
+
 file(MAKE_DIRECTORY "${SOURCE_PATH}/ext/robin-map/tsl")
 
-if(VCPKG_LIBRARY_LINKAGE STREQUAL static)
-    set(BUILDSTATIC ON)
-    set(LINKSTATIC ON)
-else()
-    set(BUILDSTATIC OFF)
-    set(LINKSTATIC OFF)
-endif()
+string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" LINKSTATIC)
 
-# Features
-set(USE_LIBRAW OFF)
-if("libraw" IN_LIST FEATURES)
-    set(USE_LIBRAW ON)
-endif()
-
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
-    OPTIONS
-        -DOIIO_BUILD_TOOLS=OFF
-        -DOIIO_BUILD_TESTS=OFF
-        -DHIDE_SYMBOLS=ON
-        -DUSE_DICOM=OFF
-        -DUSE_FFMPEG=OFF
-        -DUSE_FIELD3D=OFF
-        -DUSE_FREETYPE=OFF
-        -DUSE_GIF=OFF
-        -DUSE_LIBRAW=${USE_LIBRAW}
-        -DUSE_NUKE=OFF
-        -DUSE_OCIO=OFF
-        -DUSE_OPENCV=OFF
-        -DUSE_OPENJPEG=OFF
-        -DUSE_OPENSSL=OFF
-        -DUSE_PTEX=OFF
-        -DUSE_PYTHON=OFF
-        -DUSE_QT=OFF
-        -DUSE_WEBP=OFF
-        -DBUILDSTATIC=${BUILDSTATIC}
-        -DLINKSTATIC=${LINKSTATIC}
-        -DBUILD_MISSING_PYBIND11=OFF
-        -DBUILD_MISSING_DEPS=OFF
-        -DCMAKE_DISABLE_FIND_PACKAGE_Git=ON
-        -DVERBOSE=ON
-    OPTIONS_DEBUG
-        -DOPENEXR_CUSTOM_LIB_DIR=${CURRENT_INSTALLED_DIR}/debug/lib
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        libraw      USE_LIBRAW
+        opencolorio USE_OPENCOLORIO
+        ffmpeg      USE_FFMPEG
+        field3d     USE_FIELD3D
+        freetype    USE_FREETYPE
+        gif         USE_GIF
+        opencv      USE_OPENCV
+        openjpeg    USE_OPENJPEG
+        webp        USE_WEBP
+        pybind11    USE_PYTHON
+        tools       OIIO_BUILD_TOOLS
 )
 
-vcpkg_install_cmake()
+vcpkg_find_acquire_program(PYTHON3)
+get_filename_component(PYTHON3_DIR "${PYTHON3}" DIRECTORY)
+vcpkg_add_to_path("${PYTHON3_DIR}")
+
+vcpkg_cmake_configure(
+    SOURCE_PATH ${SOURCE_PATH}
+    OPTIONS
+        ${FEATURE_OPTIONS}
+        -DOIIO_BUILD_TESTS=OFF
+        -DUSE_DCMTK=OFF
+        -DUSE_NUKE=OFF
+        -DUSE_QT=OFF
+        -DUSE_PTEX=OFF
+        -DLINKSTATIC=${LINKSTATIC}
+        -DBUILD_MISSING_FMT=OFF
+        -DBUILD_MISSING_ROBINMAP=OFF
+        -DBUILD_MISSING_DEPS=OFF
+        -DSTOP_ON_WARNING=OFF
+        -DVERBOSE=ON
+)
+
+vcpkg_cmake_install()
 
 vcpkg_copy_pdbs()
 
+vcpkg_cmake_config_fixup(PACKAGE_NAME OpenImageIO CONFIG_PATH lib/cmake/OpenImageIO)
+
+if("tools" IN_LIST FEATURES)
+    vcpkg_copy_tools(
+        TOOL_NAMES iconvert idiff igrep iinfo maketx oiiotool iv
+        AUTO_CLEAN
+    )
+endif()
+
 # Clean
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/doc)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/doc)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/share)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/doc"
+                    "${CURRENT_PACKAGES_DIR}/debug/doc"
+                    "${CURRENT_PACKAGES_DIR}/debug/include"
+                    "${CURRENT_PACKAGES_DIR}/debug/share")
+
+file(COPY "${SOURCE_PATH}/src/cmake/modules/FindOpenImageIO.cmake" DESTINATION "${CURRENT_PACKAGES_DIR}/share/OpenImageIO")
+file(COPY "${CMAKE_CURRENT_LIST_DIR}/vcpkg-cmake-wrapper.cmake" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
 
 # Handle copyright
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/openimageio)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/openimageio/LICENSE ${CURRENT_PACKAGES_DIR}/share/openimageio/copyright)
+file(INSTALL "${SOURCE_PATH}/LICENSE.md" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)
+
+vcpkg_fixup_pkgconfig()

@@ -1,7 +1,3 @@
-include(vcpkg_common_functions)
-
-include(${CURRENT_INSTALLED_DIR}/share/qt5modularscripts/qt_modular_library.cmake)
-
-qt_modular_library(qtdeclarative e06032da5c1c151200215f55728b9ce0fac299076f0ca3150143525a56bcce15eb72f6aa982b439e3920d1cd7a30468b3f0913f135d644ecda277d763fb5e1b5)
-
-#file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/tools/qt5-declarative/platforminputcontexts)
+include(${CURRENT_INSTALLED_DIR}/share/qt5/qt_port_functions.cmake)
+qt_submodule_installation(OUT_SOURCE_PATH SOURCE_PATH PATCHES limits_include.patch)
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/qt5/QtQml/5.15.2/QtQml/private/qqmljsparser_p.h" "${SOURCE_PATH}" "")

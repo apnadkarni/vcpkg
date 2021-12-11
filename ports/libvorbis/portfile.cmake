@@ -1,41 +1,30 @@
-include(vcpkg_common_functions)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO xiph/vorbis
-    REF 112d3bd0aaacad51305e1464d4b381dabad0e88b
-    SHA512 df20e072a5e024ca2b8fc0e2890bb8968c0c948a833149a6026d2eaf6ab57b88b6d00d0bfb3b8bfcf879c7875e7cfacb8c6bf454bfc083b41d76132c567ff7ae
+    REF v1.3.7
+    SHA512 bfb6f5dbfd49ed38b2b08b3667c06d02e68f649068a050f21a3cc7e1e56b27afd546aaa3199c4f6448f03f6e66a82f9a9dc2241c826d3d1d4acbd38339b9e9fb
     HEAD_REF master
     PATCHES
         0001-Dont-export-vorbisenc-functions.patch
-        0002-Allow-deprecated-functions.patch
+        0002-Fixup-pkgconfig-libs.patch
 )
-
-file(TO_NATIVE_PATH "${CURRENT_INSTALLED_DIR}/include" OGG_INCLUDE)
-foreach(LIBNAME ogg.lib libogg.a libogg.dylib libogg.so)
-    if(EXISTS "${CURRENT_INSTALLED_DIR}/lib/${LIBNAME}" OR EXISTS "${CURRENT_INSTALLED_DIR}/debug/lib/${LIBNAME}")
-        file(TO_NATIVE_PATH "${CURRENT_INSTALLED_DIR}/lib/${LIBNAME}" OGG_LIB_REL)
-        file(TO_NATIVE_PATH "${CURRENT_INSTALLED_DIR}/debug/lib/${LIBNAME}" OGG_LIB_DBG)
-        break()
-    endif()
-endforeach()
-
-if(NOT OGG_LIB_REL)
-    message(FATAL_ERROR "Could not find libraries for dependency libogg!")
-endif()
 
 vcpkg_configure_cmake(
     SOURCE_PATH ${SOURCE_PATH}
     PREFER_NINJA
-    OPTIONS -DOGG_INCLUDE_DIRS=${OGG_INCLUDE}
-    OPTIONS_RELEASE -DOGG_LIBRARIES=${OGG_LIB_REL}
-    OPTIONS_DEBUG -DOGG_LIBRARIES=${OGG_LIB_DBG}
 )
 
 vcpkg_install_cmake()
+vcpkg_fixup_cmake_targets(
+    CONFIG_PATH lib/cmake/Vorbis
+    TARGET_PATH share/Vorbis
+)
 
 file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
 
 # Handle copyright
-configure_file(${SOURCE_PATH}/COPYING ${CURRENT_PACKAGES_DIR}/share/libvorbis/copyright COPYONLY)
+configure_file(${SOURCE_PATH}/COPYING ${CURRENT_PACKAGES_DIR}/share/${PORT}/copyright COPYONLY)
 
 vcpkg_copy_pdbs()
+
+vcpkg_fixup_pkgconfig()

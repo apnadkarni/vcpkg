@@ -1,25 +1,12 @@
-include(vcpkg_common_functions)
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO uWebSockets/uWebSockets
-    REF v0.14.8
-    SHA512 5e78e2f10e95648ad1e7f26612f69da3bbdcdb3f17c99e3bb9775e3eb440a2741f05375dcc043b43f0f2d4de6da54e7534431c5c10c1350103a4379b55cf9081
+    REPO uNetworking/uWebSockets
+    REF v20.8.0
+    SHA512 2ebb75ce2cd0194b9846a16ea69eb7d9aa25e3673cca0afbb61946989380256ebc27cf24c98bee0bf1264c7b60d84ebb01511454973e5ce165fafc7f75b52902
     HEAD_REF master
 )
 
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt DESTINATION ${SOURCE_PATH})
+file(COPY "${SOURCE_PATH}/src"  DESTINATION "${CURRENT_PACKAGES_DIR}/include")
+file(RENAME "${CURRENT_PACKAGES_DIR}/include/src" "${CURRENT_PACKAGES_DIR}/include/uwebsockets")
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
-    OPTIONS_DEBUG
-        -DINSTALL_HEADERS=OFF
-)
-
-vcpkg_install_cmake()
-
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/uwebsockets)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/uwebsockets/LICENSE ${CURRENT_PACKAGES_DIR}/share/uwebsockets/copyright)
-
-vcpkg_copy_pdbs()
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

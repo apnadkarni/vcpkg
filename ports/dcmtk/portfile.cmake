@@ -1,22 +1,16 @@
-include(vcpkg_common_functions)
-
-if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
-    message("DCMTK only supports static library linkage")
-    set(VCPKG_LIBRARY_LINKAGE static)
-endif()
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO DCMTK/dcmtk
-    REF DCMTK-3.6.3
-    SHA512 5863d0c05f046075b998bced7c8c71bf8e969dd366f26d48cdf26012ea744ae4a22784a5c3c12e12b0f188e997c93a6890ef0c3c336865ea93f13c45f70b258d
+    REF 6cb30bd7fb42190e0188afbd8cb961c62a6fb9c9 # DCMTK-3.6.6
+    SHA512 3fbd524bc0b9dced2cdddca850c88d8785ca5f333c5f1598ffbffb8e5c33d11eebdce9ed935245048ac45a7ccd7bd9e4ca79eaacf752cba64a5534b76e5efcdb
     HEAD_REF master
     PATCHES ${CMAKE_CURRENT_LIST_DIR}/dcmtk.patch
 )
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         -DDCMTK_WITH_DOXYGEN=OFF
         -DDCMTK_WITH_ZLIB=OFF
@@ -31,19 +25,26 @@ vcpkg_configure_cmake(
         -DDCMTK_ENABLE_PRIVATE_TAGS=ON
         -DBUILD_APPS=OFF
         -DDCMTK_ENABLE_CXX11=ON
-        -DCMAKE_DEBUG_POSTFIX="d"
+        -DDCMTK_WIDE_CHAR_FILE_IO_FUNCTIONS=ON
+        -DDCMTK_WIDE_CHAR_MAIN_FUNCTION=ON
+        -DCMAKE_DEBUG_POSTFIX=d
     OPTIONS_DEBUG
         -DINSTALL_HEADERS=OFF
         -DINSTALL_OTHER=OFF
 )
 
-vcpkg_install_cmake()
+vcpkg_cmake_install()
 vcpkg_copy_pdbs()
 
-vcpkg_fixup_cmake_targets()
+vcpkg_cmake_config_fixup()
 
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/share)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/dcmtk/config/osconfig.h" "#define DCMTK_PREFIX \"${CURRENT_PACKAGES_DIR}\"" "")
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/dcmtk/config/osconfig.h" "#define DCM_DICT_DEFAULT_PATH \"${CURRENT_PACKAGES_DIR}/share/dcmtk/dicom.dic:${CURRENT_PACKAGES_DIR}/share/dcmtk/private.dic\"" "")
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/dcmtk/config/osconfig.h" "#define DEFAULT_CONFIGURATION_DIR \"${CURRENT_PACKAGES_DIR}/etc/dcmtk/\"" "")
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/include/dcmtk/config/osconfig.h" "#define DEFAULT_SUPPORT_DATA_DIR \"${CURRENT_PACKAGES_DIR}/share/dcmtk/\"" "")
 
 # Handle copyright
-file(INSTALL ${SOURCE_PATH}/COPYRIGHT DESTINATION ${CURRENT_PACKAGES_DIR}/share/dcmtk RENAME copyright)
+file(INSTALL "${SOURCE_PATH}/COPYRIGHT" DESTINATION "${CURRENT_PACKAGES_DIR}/share/dcmtk" RENAME copyright)

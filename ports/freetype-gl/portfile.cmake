@@ -1,17 +1,12 @@
-if (VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
-    message(STATUS "Warning: Dynamic building not supported yet. Building static.")
-    set(VCPKG_LIBRARY_LINKAGE static)
-endif()
-
-include(vcpkg_common_functions)
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO rougier/freetype-gl
-    REF 7a290ac372d2bd94137a9fed6b2f5a6ac4360ec2
-    SHA512 bcdd34b7cee1ebe01ae83211e7b772742f9740aa713298f6fb72e7076f5fecdb3aea12f67a5fe04e8606d9533a0ceef7c1152368643dc51a7339b0e5dd307afa
+    REF 1a8c007f3fe7b1441f9e5616bc23d7455f4b07dd # accessed on 2020-09-14
+    SHA512 ce858b5d5e892162daf6f5bff3476938e15cb9f04adbf2dc2b4c538bfda56b023278b3acb62940a9388c46b89edfd22c9c1c99891f8fcf9d926ffedb8af2b38e
     HEAD_REF master
-    PATCHES 0001-Use-external-Glew-and-Freetype.patch
+    PATCHES glew.patch
 )
 
 # make sure that no "internal" libraries are used by removing them
@@ -43,15 +38,16 @@ file(INSTALL ${HEADER_FILES} DESTINATION ${CURRENT_PACKAGES_DIR}/include/freetyp
 
 # LIB
 file(GLOB LIBS
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/*.lib"
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/Release/*.lib"
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/*/Release/*.lib"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/Release/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-rel/*/Release/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
 )
 file(GLOB DEBUG_LIBS
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/*.lib"
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/Debug/*.lib"
-    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/*/Debug/*.lib"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/Debug/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
+    "${CURRENT_BUILDTREES_DIR}/${TARGET_TRIPLET}-dbg/*/Debug/*${VCPKG_TARGET_STATIC_LIBRARY_SUFFIX}"
 )
+
 file(INSTALL ${LIBS} DESTINATION ${CURRENT_PACKAGES_DIR}/lib)
 file(INSTALL ${DEBUG_LIBS} DESTINATION ${CURRENT_PACKAGES_DIR}/debug/lib)
 

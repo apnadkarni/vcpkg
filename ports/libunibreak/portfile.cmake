@@ -1,13 +1,10 @@
-include(vcpkg_common_functions)
-if(VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
-  message(WARNING "Dynamic not supported building static")
-  set(VCPKG_LIBRARY_LINKAGE static)
-endif()
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
+
 vcpkg_from_github(
   OUT_SOURCE_PATH SOURCE_PATH
   REPO adah1972/libunibreak
-  REF  libunibreak_4_0
-  SHA512  f11295133a1c65f365a5287f7377f69ac7998f19b06d44818fb55c8a5ba3edabc36de8d1b7c0d38db9d982f0e443d0a751f6d51841865094122df4cd74c9af3b
+  REF 8df6ef4ebe5dbd2a49539d05366337ab7fb57ae3 # libunibreak_4_3
+  SHA512 791e342dcc0e79e15f578ec93239d53a656f9e1804f9ec8b970cfac2b6c4f3456855513c36f18f8e72a91dac64060abc336e4716d584dbec86e1fb0c91eded69
   HEAD_REF master
 )
 

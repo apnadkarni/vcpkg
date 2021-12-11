@@ -1,40 +1,80 @@
-include(vcpkg_common_functions)
+vcpkg_fail_port_install(ON_TARGET "uwp")
 
 vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO GoogleCloudPlatform/google-cloud-cpp
-    REF v0.5.0
-    SHA512 48c5f4828bc85ae2c4bfe52b5bb51ff5da6a4cd6759f819aefaf9c23d7fffeb0a10390274f0e83f030f66f59a364c05583240e426143073187f104345e0b05d5
-    HEAD_REF master
+    REPO googleapis/google-cloud-cpp
+    REF v1.34.1
+    SHA512 2a11fb5f4ee620312575281e7ee0b1caa1c110c411b623d7ae4e9bb87c5f34dcf4c63fcb238e5e943deb02e7fcbb8b0e294ec966b98aecd164dc40cf6b6ecc1b
+    HEAD_REF main
 )
 
-set(GOOGLEAPIS_VERSION 6a3277c0656219174ff7c345f31fb20a90b30b97)
-vcpkg_download_distfile(GOOGLEAPIS
-    URLS "https://github.com/google/googleapis/archive/${GOOGLEAPIS_VERSION}.zip"
-    FILENAME "googleapis-${GOOGLEAPIS_VERSION}.zip"
-    SHA512 809b7cf0429df9867c8ab558857785e9d7d70aea033c6d588b60d29d2754001e9aea5fcdd8cae22fad8145226375bedbd1516d86af7d1e9731fffea331995ad9
-)
+vcpkg_add_to_path(PREPEND "${CURRENT_HOST_INSTALLED_DIR}/tools/grpc")
 
-file(REMOVE_RECURSE ${SOURCE_PATH}/third_party)
-vcpkg_extract_source_archive(${GOOGLEAPIS} ${SOURCE_PATH}/third_party)
-file(RENAME ${SOURCE_PATH}/third_party/googleapis-${GOOGLEAPIS_VERSION} ${SOURCE_PATH}/third_party/googleapis)
+set(GOOGLE_CLOUD_CPP_ENABLE "${FEATURES}")
+list(REMOVE_ITEM GOOGLE_CLOUD_CPP_ENABLE "core")
+list(REMOVE_ITEM GOOGLE_CLOUD_CPP_ENABLE "googleapis")
 
-vcpkg_configure_cmake(
+vcpkg_cmake_configure(
     SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
+    DISABLE_PARALLEL_CONFIGURE
     OPTIONS
-        -DGOOGLE_CLOUD_CPP_DEPENDENCY_PROVIDER=package
+        "-DGOOGLE_CLOUD_CPP_ENABLE=${GOOGLE_CLOUD_CPP_ENABLE}"
         -DGOOGLE_CLOUD_CPP_ENABLE_MACOS_OPENSSL_CHECK=OFF
-	-DBUILD_TESTING=OFF
+        -DGOOGLE_CLOUD_CPP_ENABLE_WERROR=OFF
+        -DGOOGLE_CLOUD_CPP_ENABLE_CCACHE=OFF
+        -DGOOGLE_CLOUD_CPP_ENABLE_EXAMPLES=OFF
+        -DBUILD_TESTING=OFF
 )
 
-vcpkg_install_cmake(ADD_BIN_TO_PATH)
+vcpkg_cmake_install()
 
 file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-vcpkg_fixup_cmake_targets(CONFIG_PATH lib/cmake TARGET_PATH share)
+foreach(feature IN LISTS FEATURES)
+    set(config_path "lib/cmake/google_cloud_cpp_${feature}")
+    # Most features get their own package in `google-cloud-cpp`.
+    # The exceptions are captured by this `if()` command, basically
+    # things like `core` and `experimental-storage-grpc` are skipped.
+    if(NOT IS_DIRECTORY "${CURRENT_PACKAGES_DIR}/${config_path}")
+        continue()
+    endif()
+    vcpkg_cmake_config_fixup(PACKAGE_NAME "google_cloud_cpp_${feature}"
+                             CONFIG_PATH "${config_path}"
+                             DO_NOT_DELETE_PARENT_CONFIG_PATH)
+endforeach()
+# These packages are automatically installed depending on what features are
+# enabled.
+foreach(suffix common googleapis grpc_utils)
+    set(config_path "lib/cmake/google_cloud_cpp_${suffix}")
+    if(NOT IS_DIRECTORY "${CURRENT_PACKAGES_DIR}/${config_path}")
+        continue()
+    endif()
+    vcpkg_cmake_config_fixup(PACKAGE_NAME "google_cloud_cpp_${suffix}"
+                             CONFIG_PATH "${config_path}"
+                             DO_NOT_DELETE_PARENT_CONFIG_PATH)
+endforeach()
 
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/google-cloud-cpp RENAME copyright)
+# These packages are only for backwards compability. The google-cloud-cpp team
+# is planning to remove them around 2022-02-15.
+foreach(package
+        googleapis
+        bigtable_client
+        pubsub_client
+        spanner_client
+        storage_client)
+    set(config_path "lib/cmake/${package}")
+    if(NOT IS_DIRECTORY "${CURRENT_PACKAGES_DIR}/${config_path}")
+        continue()
+    endif()
+    vcpkg_cmake_config_fixup(PACKAGE_NAME "${package}"
+                             CONFIG_PATH "${config_path}"
+                             DO_NOT_DELETE_PARENT_CONFIG_PATH)
+endforeach()
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/lib/cmake"
+                    "${CURRENT_PACKAGES_DIR}/debug/lib/cmake"
+                    "${CURRENT_PACKAGES_DIR}/debug/share") 
+file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)
 
 vcpkg_copy_pdbs()

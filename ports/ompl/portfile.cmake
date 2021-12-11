@@ -1,38 +1,26 @@
-# Common Ambient Variables:
-#   CURRENT_BUILDTREES_DIR    = ${VCPKG_ROOT_DIR}\buildtrees\${PORT}
-#   CURRENT_PACKAGES_DIR      = ${VCPKG_ROOT_DIR}\packages\${PORT}_${TARGET_TRIPLET}
-#   CURRENT_PORT_DIR          = ${VCPKG_ROOT_DIR}\ports\${PORT}
-#   PORT                      = current port name (zlib, etc)
-#   TARGET_TRIPLET            = current triplet (x86-windows, x64-windows-static, etc)
-#   VCPKG_CRT_LINKAGE         = C runtime linkage type (static, dynamic)
-#   VCPKG_LIBRARY_LINKAGE     = target library linkage type (static, dynamic)
-#   VCPKG_ROOT_DIR            = <C:\path\to\current\vcpkg>
-#   VCPKG_TARGET_ARCHITECTURE = target architecture (x64, x86, arm)
-#
+vcpkg_buildpath_length_warning(37)
 
-include(vcpkg_common_functions)
+set(OMPL_VERSION 1.5.1)
 
-set(OMPL_VERSION 1.4.1)
-vcpkg_download_distfile(ARCHIVE
-    URLS "https://github.com/ompl/ompl/archive/${OMPL_VERSION}.zip"
-    FILENAME "ompl-${OMPL_VERSION}.zip"
-    SHA512 2552476e86fdd4d61a5663d401c18f873424127d04d2342f1e0e5d4a15212b952c9de59f1a2483c2c71ee3cc3aadbe1b5912ae7fa262c218dd0b22daadfcd95c
-)
-
-vcpkg_extract_source_archive_ex(
+vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    ARCHIVE ${ARCHIVE}
-    REF ${OMPL_VERSION}
-    PATCHES 
-        "001-disable-extra-components.patch"
+    REPO ompl/ompl
+    REF 1.5.1
+    SHA512 2f28d29f32f3bb03e67b29ce251e4786364847a25e3c4cf66d7663ed38dca4da71d4e03cf9ce647710d9524a3907c76c09795e77f041cb8822f695d28f5ca570
+    HEAD_REF master
+    PATCHES
+        0001_Export_targets.patch
+        0002_Fix_config.patch
 )
-# For some reason, demos and tests are being installed 
-# even when disabling the correct OMPL options.
-# The "001-disable-extra-components.patch" avoids that issue.
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
-    OPTIONS 
+
+# Based on selected features different files get downloaded, so use the following command instead of patch.
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt" "find_package(Eigen3 REQUIRED)" "find_package(Eigen3 REQUIRED CONFIG)")
+vcpkg_replace_string("${SOURCE_PATH}/CMakeLists.txt" "find_package(ccd REQUIRED)" "find_package(ccd REQUIRED CONFIG)")
+
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    DISABLE_PARALLEL_CONFIGURE
+    OPTIONS
         -DOMPL_VERSIONED_INSTALL=OFF
         -DOMPL_REGISTRATION=OFF
         -DOMPL_BUILD_DEMOS=OFF
@@ -41,16 +29,24 @@ vcpkg_configure_cmake(
         -DOMPL_BUILD_PYTESTS=OFF
 )
 
-vcpkg_install_cmake()
+vcpkg_cmake_install()
 
-vcpkg_fixup_cmake_targets(CONFIG_PATH share/ompl/cmake)
+vcpkg_cmake_config_fixup(CONFIG_PATH share/ompl/cmake)
+vcpkg_fixup_pkgconfig()
 
-# Remove debug distribution
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/share)
+# Remove debug distribution and other, move ompl_benchmark to tools/ dir
+file(REMOVE_RECURSE
+    "${CURRENT_PACKAGES_DIR}/debug/include"
+    "${CURRENT_PACKAGES_DIR}/debug/share"
+    "${CURRENT_PACKAGES_DIR}/share/man"
+    "${CURRENT_PACKAGES_DIR}/share/ompl/demos"
+    "${CURRENT_PACKAGES_DIR}/share/ompl/ompl.conf"
+    "${CURRENT_PACKAGES_DIR}/share/ompl/plannerarena"
+)
+
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+    file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/bin" "${CURRENT_PACKAGES_DIR}/debug/bin")
+endif()
 
 # Handle copyright
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/ompl RENAME copyright)
-
-# Post-build test for cmake libraries
-# vcpkg_test_cmake(PACKAGE_NAME ompl)
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

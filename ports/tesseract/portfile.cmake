@@ -1,54 +1,73 @@
-include(vcpkg_common_functions)
-
-if (VCPKG_LIBRARY_LINKAGE STREQUAL dynamic)
-    message(STATUS "Warning: Dynamic building not supported yet. Building static.")
-    set(VCPKG_LIBRARY_LINKAGE static)
-endif()
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO tesseract-ocr/tesseract
-    REF 4.0.0
-    SHA512 69e57d4ba1fc43d212fd0fff69a2b5d48a3b37cfee7054fdc083cbb7e04d92317609a32e457229661d70ce8d9b16c9d25e81bfc3861db660dd2c8f292202d447
-    HEAD_REF master
-)
-
-vcpkg_apply_patches(
-    SOURCE_PATH ${SOURCE_PATH}
+    REF 4.1.1
+    SHA512 017723a2268be789fe98978eed02fd294968cc8050dde376dee026f56f2b99df42db935049ae5e72c4519a920e263b40af1a6a40d9942e66608145b3131a71a2
     PATCHES
-        ${CMAKE_CURRENT_LIST_DIR}/use-vcpkg-icu.patch
-        ${CMAKE_CURRENT_LIST_DIR}/ws2-32.patch
-        ${CMAKE_CURRENT_LIST_DIR}/leptonica.patch
+        fix-tiff-linkage.patch
+        fix-timeval.patch # Remove this patch in the next update
 )
 
 # The built-in cmake FindICU is better
-file(REMOVE ${SOURCE_PATH}/cmake/FindICU.cmake)
+file(REMOVE "${SOURCE_PATH}/cmake/FindICU.cmake")
 
-vcpkg_configure_cmake(
-    SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
-    OPTIONS
-        -DSTATIC=ON
-        -DUSE_SYSTEM_ICU=True
+string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" BUILD_STATIC)
+
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        training-tools  BUILD_TRAINING_TOOLS
 )
 
-vcpkg_install_cmake()
+if("cpu-independed" IN_LIST FEATURES)
+    set(TARGET_ARCHITECTURE none)
+else()
+    set(TARGET_ARCHITECTURE auto)
+endif()
 
-vcpkg_fixup_cmake_targets(CONFIG_PATH "cmake")
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        ${FEATURE_OPTIONS}
+        -DSTATIC=${BUILD_STATIC}
+        -DUSE_SYSTEM_ICU=True
+        -DCMAKE_DISABLE_FIND_PACKAGE_LibArchive=ON
+        -DCMAKE_DISABLE_FIND_PACKAGE_OpenCL=ON
+        -DLeptonica_DIR=YES
+        -DTARGET_ARCHITECTURE=${TARGET_ARCHITECTURE}
+)
 
-# Install tool
-file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/tools/tesseract)
-file(COPY ${CURRENT_PACKAGES_DIR}/bin/tesseract.exe DESTINATION ${CURRENT_PACKAGES_DIR}/tools/tesseract)
-vcpkg_copy_tool_dependencies(${CURRENT_PACKAGES_DIR}/tools/tesseract)
-
+vcpkg_cmake_install()
 vcpkg_copy_pdbs()
 
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/bin)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/bin)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/lib/pkgconfig)
-file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig)
+vcpkg_cmake_config_fixup(CONFIG_PATH cmake)
+
+vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/share/tesseract/TesseractConfig.cmake"
+    "find_package(Leptonica REQUIRED)"
+[[
+find_package(Leptonica REQUIRED)
+find_package(LibArchive REQUIRED)
+]]
+)
+
+vcpkg_copy_tools(TOOL_NAMES tesseract AUTO_CLEAN)
+
+if(NOT VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "debug")
+    vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/tesseract.pc" "-ltesseract41" "-ltesseract41d")
+endif()
+vcpkg_fixup_pkgconfig()
+
+if("training-tools" IN_LIST FEATURES)
+    list(APPEND TRAINING_TOOLS
+        ambiguous_words classifier_tester combine_tessdata
+        cntraining dawg2wordlist mftraining shapeclustering
+        wordlist2dawg combine_lang_model lstmeval lstmtraining
+        set_unicharset_properties unicharset_extractor text2image
+    )
+    vcpkg_copy_tools(TOOL_NAMES ${TRAINING_TOOLS} AUTO_CLEAN)
+endif()
+
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 
 # Handle copyright
-file(COPY ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/tesseract)
-file(RENAME ${CURRENT_PACKAGES_DIR}/share/tesseract/LICENSE ${CURRENT_PACKAGES_DIR}/share/tesseract/copyright)
+file(INSTALL "${SOURCE_PATH}/LICENSE" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)

@@ -1,18 +1,13 @@
-include(vcpkg_common_functions)
-
-if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
-    set(VCPKG_LIBRARY_LINKAGE "static")
-    message("CAF only supports static library linkage")
-endif()
+vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO actor-framework/actor-framework
-    REF 2cc4377715afc3d3c35848f9d59b9e6876afd875
-    SHA512 7e7962bf5a30122bde8be63f6de0058f865bd890e2d10f4d90f4885b7953467fb6532f69c1a77a35802de7c531f6aac192a2993b53a8dc0b05f503c3f4083a31
+    REF f7d4fc7ac679e18ba385f64434f8015c3cea9cb5 # 0.17.6
+    SHA512 8b4719c26dfad68eed6f2528263702e42f9865bb7a9f2d40909dc6c3fc20bb7259fe44a5f89390ba714c7f9359db2d171ff44685641962c24a70f4e2aa3f3f65
     HEAD_REF master
-	PATCHES
-		openssl-version-override.patch
+    PATCHES
+        openssl-version-override.patch
 )
 
 vcpkg_configure_cmake(
@@ -32,6 +27,7 @@ vcpkg_configure_cmake(
         -DCAF_NO_OPENSSL=OFF
         -DCAF_NO_CURL_EXAMPLES=ON
         -DCAF_OPENSSL_VERSION_OVERRIDE=ON
+        -DCAF_ENABLE_UTILITY_TARGETS=OFF
 )
 
 vcpkg_install_cmake()
@@ -40,6 +36,10 @@ file(REMOVE_RECURSE ${CURRENT_PACKAGES_DIR}/debug/include ${CURRENT_PACKAGES_DIR
 
 file(INSTALL
     ${SOURCE_PATH}/LICENSE
-    DESTINATION ${CURRENT_PACKAGES_DIR}/share/caf RENAME copyright)
+    DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)
+    
+file(COPY ${SOURCE_PATH}/cmake/FindCAF.cmake DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT})
+file(INSTALL ${CMAKE_CURRENT_LIST_DIR}/vcpkg-cmake-wrapper.cmake DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT})
+file(INSTALL ${CMAKE_CURRENT_LIST_DIR}/usage DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT})
 
 vcpkg_copy_pdbs()
